@@ -83,6 +83,7 @@ import PeakCache from './peakcache';
  * @property {boolean} splitChannels=false Render with seperate waveforms for
  * the channels of the audio
  * @property {string} waveColor='#999' The fill color of the waveform after the
+ * @property {boolean} drawerEnabled=true Whether the canvas should be drawn or not
  * cursor.
  */
 
@@ -199,7 +200,8 @@ export default class WaveSurfer extends util.Observer {
         scrollParent  : false,
         skipLength    : 2,
         splitChannels : false,
-        waveColor     : '#999'
+        waveColor     : '#999',
+        drawerEnabled : true
     }
 
     /** @private */
@@ -348,7 +350,8 @@ export default class WaveSurfer extends util.Observer {
         // timeout for the debounce function.
         let prevWidth = 0;
         this._onResize = util.debounce(() => {
-            if (prevWidth != this.drawer.wrapper.clientWidth) {
+            if (this.params.drawerEnabled &&
+                (prevWidth != this.drawer.wrapper.clientWidth)) {
                 prevWidth = this.drawer.wrapper.clientWidth;
                 this.drawBuffer();
             }
@@ -367,9 +370,13 @@ export default class WaveSurfer extends util.Observer {
      */
     init() {
         this.registerPlugins(this.params.plugins);
-        this.createDrawer();
+        if (this.params.drawerEnabled) {
+            this.createDrawer();
+        }
         this.createBackend();
-        this.createPeakCache();
+        if (this.params.drawerEnabled) {
+            this.createPeakCache();
+        }
         return this;
     }
 
@@ -562,7 +569,9 @@ export default class WaveSurfer extends util.Observer {
         this.backend.on('pause', () => this.fireEvent('pause'));
 
         this.backend.on('audioprocess', time => {
-            this.drawer.progress(this.backend.getPlayedPercents());
+            if (this.params.drawerEnabled) {
+                this.drawer.progress(this.backend.getPlayedPercents());
+            }
             this.fireEvent('audioprocess', time);
         });
     }
@@ -704,7 +713,9 @@ export default class WaveSurfer extends util.Observer {
      */
     seekAndCenter(progress) {
         this.seekTo(progress);
-        this.drawer.recenter(progress);
+        if (this.params.drawerEnabled) {
+            this.drawer.recenter(progress);
+        }
     }
 
     /**
@@ -729,7 +740,10 @@ export default class WaveSurfer extends util.Observer {
         const oldScrollParent = this.params.scrollParent;
         this.params.scrollParent = false;
         this.backend.seekTo(progress * this.getDuration());
-        this.drawer.progress(this.backend.getPlayedPercents());
+
+        if (this.params.drawerEnabled) {
+            this.drawer.progress(this.backend.getPlayedPercents());
+        }
 
         if (!paused) {
             this.backend.play();
@@ -746,7 +760,9 @@ export default class WaveSurfer extends util.Observer {
     stop() {
         this.pause();
         this.seekTo(0);
-        this.drawer.progress(0);
+        if (this.params.drawerEnabled) {
+            this.drawer.progress(0);
+        }
     }
 
     /**
@@ -857,7 +873,9 @@ export default class WaveSurfer extends util.Observer {
      */
     toggleScroll() {
         this.params.scrollParent = !this.params.scrollParent;
-        this.drawBuffer();
+        if (this.params.drawerEnabled) {
+            this.drawBuffer();
+        }
     }
 
     /**
@@ -916,6 +934,9 @@ export default class WaveSurfer extends util.Observer {
      * @example wavesurfer.zoom(20);
      */
     zoom(pxPerSec) {
+        if (!this.params.drawerEnabled) {
+            return;
+        }
         if (!pxPerSec) {
             this.params.minPxPerSec = this.defaultParams.minPxPerSec;
             this.params.scrollParent = false;
@@ -956,7 +977,9 @@ export default class WaveSurfer extends util.Observer {
      */
     loadDecodedBuffer(buffer) {
         this.backend.load(buffer);
-        this.drawBuffer();
+        if (this.params.drawerEnabled) {
+            this.drawBuffer();
+        }
         this.fireEvent('ready');
         this.isReady = true;
     }
@@ -1022,8 +1045,10 @@ export default class WaveSurfer extends util.Observer {
         };
 
         if (peaks) {
-            this.backend.setPeaks(peaks);
-            this.drawBuffer();
+            if (this.params.drawerEnabled) {
+                this.backend.setPeaks(peaks);
+                this.drawBuffer();
+            }
             this.tmpEvents.push(this.once('interaction', load));
         } else {
             return load();
@@ -1057,7 +1082,9 @@ export default class WaveSurfer extends util.Observer {
 
         this.tmpEvents.push(
             this.backend.once('canplay', () => {
-                this.drawBuffer();
+                if (this.params.drawerEnabled) {
+                    this.drawBuffer();
+                }
                 this.fireEvent('ready');
                 this.isReady = true;
             }),
@@ -1075,8 +1102,10 @@ export default class WaveSurfer extends util.Observer {
             this.getArrayBuffer(url, arraybuffer => {
                 this.decodeArrayBuffer(arraybuffer, buffer => {
                     this.backend.buffer = buffer;
-                    this.backend.setPeaks(null);
-                    this.drawBuffer();
+                    if (this.params.drawerEnabled) {
+                        this.backend.setPeaks(null);
+                        this.drawBuffer();
+                    }
                     this.fireEvent('waveform-ready');
                 });
             });
@@ -1195,6 +1224,10 @@ export default class WaveSurfer extends util.Observer {
      * @return {string} data URI of image
      */
     exportImage(format, quality) {
+        if (!this.params.drawerEnabled) {
+            return;
+        }
+
         if (!format) {
             format = 'image/png';
         }
@@ -1232,9 +1265,11 @@ export default class WaveSurfer extends util.Observer {
         }
         this.cancelAjax();
         this.clearTmpEvents();
-        this.drawer.progress(0);
-        this.drawer.setWidth(0);
-        this.drawer.drawPeaks({ length: this.drawer.getWidth() }, 0);
+        if (this.params.drawerEnabled) {
+            this.drawer.progress(0);
+            this.drawer.setWidth(0);
+            this.drawer.drawPeaks({ length: this.drawer.getWidth() }, 0);
+        }
     }
 
     /**
@@ -1252,7 +1287,9 @@ export default class WaveSurfer extends util.Observer {
             window.removeEventListener('resize', this._onResize, true);
         }
         this.backend.destroy();
-        this.drawer.destroy();
+        if (this.params.drawerEnabled) {
+            this.drawer.destroy();
+        }
         this.isDestroyed = true;
         this.arraybuffer = null;
     }
