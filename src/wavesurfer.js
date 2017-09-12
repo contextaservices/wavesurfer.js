@@ -350,10 +350,11 @@ export default class WaveSurfer extends util.Observer {
         // timeout for the debounce function.
         let prevWidth = 0;
         this._onResize = util.debounce(() => {
-            if (this.params.drawerEnabled &&
-                (prevWidth != this.drawer.wrapper.clientWidth)) {
-                prevWidth = this.drawer.wrapper.clientWidth;
-                this.drawBuffer();
+            if (this.params.drawerEnabled) {
+                if (prevWidth != this.drawer.wrapper.clientWidth) {
+                    prevWidth = this.drawer.wrapper.clientWidth;
+                    this.drawBuffer();
+                }
             }
         }, typeof this.params.responsive === 'number' ? this.params.responsive : 100);
 
